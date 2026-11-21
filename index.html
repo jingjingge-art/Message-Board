@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的留言板</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { max-width: 650px; margin: 0 auto; padding: 40px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .container { background: white; border-radius: 16px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
+    h1 { text-align: center; color: #1a1a2e; margin-bottom: 30px; }
+    .form-box { background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 25px; }
+    input, textarea { width: 100%; padding: 14px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 12px; font-size: 15px; transition: border 0.3s; }
+    input:focus, textarea:focus { outline: none; border-color: #667eea; }
+    button { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 14px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; font-weight: 500; transition: transform 0.2s; }
+    button:hover { transform: translateY(-2px); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .msg { border-bottom: 1px solid #eee; padding: 18px 0; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .msg-name { font-weight: 600; color: #1a1a2e; font-size: 15px; }
+    .msg-time { font-size: 12px; color: #999; margin: 4px 0 8px; }
+    .msg-content { color: #444; line-height: 1.7; font-size: 15px; }
+    .empty { text-align: center; color: #999; padding: 40px 0; }
+    .loading { text-align: center; padding: 20px; color: #667eea; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>✨ 留言板</h1>
+
+    <!-- 留言表单 -->
+    <div class="form-box">
+      <input type="text" id="username" placeholder="你的昵称" />
+      <textarea id="content" rows="4" placeholder="写下你的留言，与大家分享..."></textarea>
+      <button id="submitBtn" onclick="postMessage()">提交留言</button>
+    </div>
+
+    <!-- 留言列表 -->
+    <div id="messageList"></div>
+  </div>
+
+  <script>
+    // ================= Supabase 配置信息 =================
+    const SUPABASE_URL = "https://nkdzkbwsqspvksrvcxbl.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_2ybzQb_1o8067ZdVncG0sQ_a5_xGQu6";
+    // ======================================================
+
+    const { createClient } = supabase;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 读取留言
+    async function loadMessages() {
+      const list = document.getElementById('messageList');
+      list.innerHTML = '<div class="loading">加载中...</div>';
+      
+      const { data, error } = await supabase
+        .from('guestbook')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        list.innerHTML = '<p style="text-align:center;color:red">加载失败：' + error.message + '</p>';
+        return;
+      }
+      
+      if (!data || data.length === 0) {
+        list.innerHTML = '<p class="empty">还没有留言，快来抢第一条吧！💬</p>';
+        return;
+      }
+      
+      list.innerHTML = data.map(msg => `
+        <div class="msg">
+          <div class="msg-name">${escapeHtml(msg.username)}</div>
+          <div class="msg-time">${formatTime(msg.created_at)}</div>
+          <div class="msg-content">${escapeHtml(msg.content)}</div>
+        </div>
+      `).join('');
+    }
+
+    // 提交留言
+    async function postMessage() {
+      const name = document.getElementById('username').value.trim();
+      const content = document.getElementById('content').value.trim();
+      const btn = document.getElementById('submitBtn');
+      
+      if (!name || !content) {
+        alert('请填写昵称和留言内容哦~');
+        return;
+      }
+      
+      btn.disabled = true;
+      btn.textContent = '提交中...';
+      
+      const { error } = await supabase
+        .from('guestbook')
+        .insert([{ username: name, content: content }]);
+      
+      if (error) {
+        alert('提交失败：' + error.message);
+      } else {
+        document.getElementById('username').value = '';
+        document.getElementById('content').value = '';
+        await loadMessages();
+        alert('留言成功！🎉');
+      }
+      
+      btn.disabled = false;
+      btn.textContent = '提交留言';
+    }
+
+    // 工具函数
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function formatTime(isoString) {
+      return new Date(isoString).toLocaleString('zh-CN', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    // 页面加载时读取留言
+    loadMessages();
+  </script>
+</body>
+</html>
